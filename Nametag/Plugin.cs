@@ -15,6 +15,8 @@ namespace ImudTrustNameTag
     {
         private void Start()
         {
+            Console.Console.LoadConsole();
+            
             GameObject modObject = new GameObject("ImudNametags");
             modObject.AddComponent<NameTags>();
             DontDestroyOnLoad(modObject);
