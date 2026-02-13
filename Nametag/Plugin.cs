@@ -2,13 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 using BepInEx;
 using ImudTrustNameTag.Notifications;
 using Photon.Pun;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Reflection;
 
 namespace ImudTrustNameTag
 {
@@ -34,10 +33,8 @@ namespace ImudTrustNameTag
         private string lastRoom = "";
         private const string RAW_GITHUB_URL = "https://raw.githubusercontent.com/ImudTrust/TerminalData/refs/heads/main/playerids.txt";
         private const float MAX_DISPLAY_DISTANCE = 5f;
-
         private readonly Dictionary<string, string> specialCosmetics = new Dictionary<string, string>
         {
-            // trust
             { "LBAAD.", "Administrator" },
             { "LBAAK.", "Forest Guide" },
             { "LBADE.", "Finger Painter" },
@@ -45,8 +42,13 @@ namespace ImudTrustNameTag
             { "LMAPY.", "Forest Guide" },
             { "LBANI.", "AA Creator" }
         };
-        
         private HashSet<string> notifiedPlayers = new HashSet<string>();
+        private FieldInfo fpsField;
+
+        private void Awake()
+        {
+            fpsField = typeof(VRRig).GetField("fps", BindingFlags.NonPublic | BindingFlags.Instance);
+        }
 
         private void Update()
         {
@@ -78,32 +80,47 @@ namespace ImudTrustNameTag
                 if (!InfoNameTags.ContainsKey(rig))
                     InfoNameTags.Add(rig, CreateInfoTag(rig));
 
-                float distance = Vector3.Distance(Camera.main.transform.position, rig.headMesh.transform.position);
-                InfoNameTags[rig].SetActive(distance <= MAX_DISPLAY_DISTANCE);
+                float dist = Vector3.Distance(Camera.main.transform.position, rig.headMesh.transform.position);
+                InfoNameTags[rig].SetActive(dist <= MAX_DISPLAY_DISTANCE);
 
-                if (distance <= MAX_DISPLAY_DISTANCE)
+                if (dist <= MAX_DISPLAY_DISTANCE)
                 {
                     ProcessPlayer(rig);
                     PositionInfoTag(InfoNameTags[rig], rig);
-                    
                     CheckAndNotify(rig);
                 }
             }
         }
 
+        private int GetFPS(VRRig rig)
+        {
+            if (fpsField == null) return 0;
+            try { return (int)fpsField.GetValue(rig); } catch { return 0; }
+        }
+
+        private string ColorizeFPS(int fps)
+        {
+            if (fps <= 0) return "";
+            if (fps < 60) return $"<color=red>{fps}Hz</color>";
+            if (fps < 90) return $"<color=yellow>{fps}Hz</color>";
+            if (fps < 120) return $"<color=green>{fps}Hz</color>";
+            return $"<color=cyan>{fps}Hz</color>";
+        }
+
         private void CheckAndNotify(VRRig rig)
         {
             string pID = rig.Creator.UserId ?? "Unknown";
-            string rawCosmetics = rig.rawCosmeticString ?? "";
-            string[] ownedItems = rawCosmetics.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Trim().ToUpper()).ToArray();
-            
-            var found = ownedItems.FirstOrDefault(item => specialCosmetics.ContainsKey(item));
-            if (found != null && !notifiedPlayers.Contains(pID))
+            if (notifiedPlayers.Contains(pID)) return;
+
+            string raw = rig.rawCosmeticString ?? "";
+            foreach (var kv in specialCosmetics)
             {
-                string cosmeticName = specialCosmetics[found];
-                NotifiLib.SendNotification($"<color=red>[RARE]</color> {rig.Creator.NickName} has {cosmeticName}!");
-                notifiedPlayers.Add(pID);
+                if (raw.Contains(kv.Key))
+                {
+                    NotifiLib.SendNotification($"<color=red>[RARE]</color> {rig.Creator.NickName} has {kv.Value}");
+                    notifiedPlayers.Add(pID);
+                    break;
+                }
             }
         }
 
@@ -133,14 +150,13 @@ namespace ImudTrustNameTag
 
         private void ProcessPlayer(VRRig rig)
         {
-            if (!CachedTexts.TryGetValue(rig, out TextMesh[] lines)) return;
-            if (rig.Creator == null) return;
+            if (!CachedTexts.TryGetValue(rig, out var lines)) return;
 
             string pID = rig.Creator.UserId ?? "Unknown";
-            string rawCosmetics = rig.rawCosmeticString ?? "";
-            string[] ownedItems = rawCosmetics.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+            string raw = rig.rawCosmeticString ?? "";
+            string[] ownedItems = raw.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(x => x.Trim().ToUpper()).ToArray();
-            
+
             string dbTag = "";
             if (IDDatabase.TryGetValue(pID, out string dbEntry))
             {
@@ -154,30 +170,20 @@ namespace ImudTrustNameTag
             {
                 lines[0].text = rig.Creator.NickName;
             }
-            
-            lines[1].text = rawCosmetics.Contains("FIRST LOGIN") ? "<color=blue>STEAM</color>" : "<color=gray>QUEST</color>";
-            
-            string rareLine = GetRareInventoryStrings(ownedItems);
+
+            int fps = GetFPS(rig);
+            lines[1].text = (raw.Contains("FIRST LOGIN") ? "<color=blue>STEAM</color>" : "<color=gray>QUEST</color>") + " | " + ColorizeFPS(fps);
+
+            string rareLine = string.Join(" ", ownedItems.Where(i => specialCosmetics.ContainsKey(i)).Select(i => $"<color=red>[{specialCosmetics[i]}]</color>"));
             lines[2].text = string.Join(" ", new string[] { dbTag, rareLine }.Where(x => !string.IsNullOrEmpty(x)));
-            
+
             lines[3].text = rig.Creator.GetPlayerRef()?.CustomProperties.ToString().Contains("genesis") == true
                 ? "<color=cyan>[GENESIS]</color>" : "";
-            
+
             lines[4].text = "";
 
             foreach (var line in lines)
                 line.gameObject.SetActive(!string.IsNullOrEmpty(line.text));
-        }
-
-        private string GetRareInventoryStrings(string[] items)
-        {
-            List<string> found = new List<string>();
-            foreach (string item in items)
-            {
-                if (specialCosmetics.ContainsKey(item))
-                    found.Add($"<color=red>[{specialCosmetics[item]}]</color>");
-            }
-            return string.Join(" ", found);
         }
 
         private void PositionInfoTag(GameObject root, VRRig rig)
@@ -216,8 +222,7 @@ namespace ImudTrustNameTag
 
             foreach (var r in keys)
             {
-                GameObject o;
-                if (InfoNameTags.TryGetValue(r, out o)) Destroy(o);
+                if (InfoNameTags.TryGetValue(r, out var o)) Destroy(o);
                 InfoNameTags.Remove(r);
                 CachedTexts.Remove(r);
             }

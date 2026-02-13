@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "aWvejnjl1SQ=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\ä\\RiderProjects\\Nametag\\Nametag\\Nametag.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\ä\\.nuget\\packages\\bepinex.assemblypublicizer.msbuild\\0.4.3\\bepinex.assemblypublicizer.msbuild.0.4.3.nupkg.sha512",
+    "C:\\Users\\ä\\.nuget\\packages\\newtonsoft.json\\13.0.4\\newtonsoft.json.13.0.4.nupkg.sha512",
+    "C:\\Users\\ä\\.nuget\\packages\\system.speech\\10.0.2\\system.speech.10.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}
