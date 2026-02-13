@@ -8,6 +8,6 @@ namespace ImudTrustNameTag
         public const string GUID = "org.ImudTrust.gorillatag.Nametag";
         public const string Name = "Nametag mod";
         public const string Description = "Made by ImudTrust";
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
     }
 }

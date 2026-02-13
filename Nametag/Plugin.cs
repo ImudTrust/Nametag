@@ -37,6 +37,7 @@ namespace ImudTrustNameTag
 
         private readonly Dictionary<string, string> specialCosmetics = new Dictionary<string, string>
         {
+            // trust
             { "LBAAD.", "Administrator" },
             { "LBAAK.", "Forest Guide" },
             { "LBADE.", "Finger Painter" },
